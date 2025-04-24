@@ -1,0 +1,67 @@
+version: "3.9"
+
+services: 
+
+  dg-db:
+    build: ./dg-db
+    container_name: dg-db
+    ports:
+      - "3307:3306"
+    env_file:
+      - .env
+    volumes:
+      - ./dg-db/init.sql:/docker-entrypoint-initdb.d/init.sql
+
+  dg-vector:
+    image: chromadb/chroma
+    container_name: dg-vector
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./dg-vector/persist:/chroma  
+
+
+  dg-ollama:
+    build:
+      context: .
+      dockerfile: dg-ollama/Dockerfile
+    container_name: dg-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ./certs:/certs
+      - ollama-models:/root/.ollama
+    restart: unless-stopped
+
+
+  dg-backend:
+    build:
+      context: .
+      dockerfile: dg-backend/dockerfile
+    container_name: dg-backend
+    ports:
+      - "8003:8003"
+    volumes:
+      - ./dg-backend:/app
+    depends_on:
+      - dg-db
+      - dg-vector
+    environment:
+      - PYTHONUNBUFFERED=1
+
+  dg-ui:
+    build:
+      context: .
+      dockerfile: dg-ui/Dockerfile
+    container_name: dg-ui
+    depends_on:
+      - dg-backend
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./dg-ui:/app
+    environment:
+      - PYTHONUNBUFFERED=1
+
+volumes:
+  ollama-models:
